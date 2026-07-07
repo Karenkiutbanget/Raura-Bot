@@ -1,0 +1,17 @@
+{
+  "name": "raura-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot commands using @whiskeysockets/baileys",
+  "main": "src/index.js",
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/commands/matheasy.js && node --check src/games/mathEasySession.js && node --check src/utils/xpDatabase.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

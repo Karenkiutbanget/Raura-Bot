@@ -1,0 +1,10 @@
+{
+  "name": "raura-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "axios": "latest"
+  }
+}

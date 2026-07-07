@@ -1,0 +1,16 @@
+{
+  "name": "raura-bot-sticker-command",
+  "version": "1.0.0",
+  "description": "Local /sticker command for Baileys WhatsApp bots",
+  "main": "src/commands/sticker.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --check src/commands/sticker.js && node --check src/lib/sticker/media.js && node --check src/lib/sticker/metadata.js && node --check src/lib/sticker/processor.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "file-type": "^16.5.4",
+    "fluent-ffmpeg": "^2.1.3",
+    "sharp": "^0.33.5"
+  }
+}

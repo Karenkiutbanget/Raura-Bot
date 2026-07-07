@@ -1,0 +1,13 @@
+{
+  "name": "raura-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot commands for Raura Bot",
+  "main": "src/commands/mathmedium.js",
+  "type": "commonjs",
+  "scripts": {
+    "check": "node --check src/commands/mathmedium.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18"
+  }
+}

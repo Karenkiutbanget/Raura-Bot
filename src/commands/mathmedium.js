@@ -1,12 +1,26 @@
 'use strict';
 
+const COMMAND = '/mathmedium';
+const LEVEL_NAME = 'Medium';
 const TOTAL_QUESTIONS = 50;
 const QUESTION_TIME_MS = 60_000;
 const MIN_TWO_DIGIT = 10;
 const MAX_TWO_DIGIT = 99;
+const XP_REWARD = 20;
 const OPERATIONS = ['+', '-', '×', '÷'];
 
-const activeGames = new Map();
+const MATH_EASY_ENGINE_CANDIDATES = [
+  './matheasy',
+  './mathEasy',
+  '../matheasy',
+  '../mathEasy',
+  '../games/matheasy',
+  '../games/mathEasy',
+  '../lib/matheasy',
+  '../lib/mathEasy',
+  '../helpers/matheasy',
+  '../helpers/mathEasy',
+];
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -21,7 +35,7 @@ function makeAdditionQuestion() {
   const right = randomInt(MIN_TWO_DIGIT, MAX_TWO_DIGIT);
 
   return {
-    text: `${left} + ${right}`,
+    question: `${left} + ${right}`,
     answer: left + right,
   };
 }
@@ -31,7 +45,7 @@ function makeSubtractionQuestion() {
   const right = randomInt(MIN_TWO_DIGIT, MAX_TWO_DIGIT);
 
   return {
-    text: `${left} - ${right}`,
+    question: `${left} - ${right}`,
     answer: left - right,
   };
 }
@@ -41,7 +55,7 @@ function makeMultiplicationQuestion() {
   const right = randomInt(MIN_TWO_DIGIT, MAX_TWO_DIGIT);
 
   return {
-    text: `${left} × ${right}`,
+    question: `${left} × ${right}`,
     answer: left * right,
   };
 }
@@ -58,12 +72,12 @@ function makeDivisionQuestion() {
   const [dividend, divisor] = pickRandom(validPairs);
 
   return {
-    text: `${dividend} ÷ ${divisor}`,
+    question: `${dividend} ÷ ${divisor}`,
     answer: dividend / divisor,
   };
 }
 
-function makeQuestion() {
+function generateMathMediumQuestion() {
   const operation = pickRandom(OPERATIONS);
 
   if (operation === '+') return makeAdditionQuestion();
@@ -73,178 +87,67 @@ function makeQuestion() {
   return makeDivisionQuestion();
 }
 
-function getChatId(message) {
-  return message?.key?.remoteJid;
-}
-
-function getSenderId(message) {
-  return message?.key?.participant || message?.key?.remoteJid;
-}
-
-function getText(message) {
-  const content = message?.message;
-
+function getFactoryFromModule(mathEasyModule) {
   return (
-    content?.conversation ||
-    content?.extendedTextMessage?.text ||
-    content?.imageMessage?.caption ||
-    content?.videoMessage?.caption ||
-    ''
-  ).trim();
-}
-
-async function sendText(sock, jid, text, quoted) {
-  return sock.sendMessage(jid, { text }, quoted ? { quoted } : undefined);
-}
-
-function formatQuestion(game) {
-  return [
-    '🧮 Math Medium',
-    '',
-    `Soal ${game.currentIndex + 1}/${TOTAL_QUESTIONS}`,
-    '',
-    game.currentQuestion.text,
-  ].join('\n');
-}
-
-function formatFinalResult(game) {
-  const wrong = game.answers.filter((answer) => answer.status === 'wrong').length;
-  const timeout = game.answers.filter((answer) => answer.status === 'timeout').length;
-
-  return [
-    '🏁 Math Medium Selesai',
-    '',
-    `Total soal: ${TOTAL_QUESTIONS}`,
-    `Benar: ${game.score}`,
-    `Salah: ${wrong}`,
-    `Waktu habis: ${timeout}`,
-  ].join('\n');
-}
-
-async function finishGame(sock, chatId) {
-  const game = activeGames.get(chatId);
-  if (!game) return;
-
-  clearTimeout(game.timer);
-  activeGames.delete(chatId);
-  await sendText(sock, chatId, formatFinalResult(game));
-}
-
-async function askNextQuestion(sock, chatId) {
-  const game = activeGames.get(chatId);
-  if (!game) return;
-
-  if (game.currentIndex >= TOTAL_QUESTIONS) {
-    await finishGame(sock, chatId);
-    return;
-  }
-
-  game.currentQuestion = makeQuestion();
-  await sendText(sock, chatId, formatQuestion(game));
-
-  game.timer = setTimeout(async () => {
-    const latestGame = activeGames.get(chatId);
-    if (!latestGame || latestGame.currentIndex !== game.currentIndex) return;
-
-    latestGame.answers.push({
-      question: latestGame.currentQuestion.text,
-      correctAnswer: latestGame.currentQuestion.answer,
-      status: 'timeout',
-    });
-    latestGame.currentIndex += 1;
-
-    await sendText(
-      sock,
-      chatId,
-      `⏰ Waktu habis! Jawaban yang benar: ${latestGame.currentQuestion.answer}`,
-    );
-    await askNextQuestion(sock, chatId);
-  }, QUESTION_TIME_MS);
-}
-
-async function startMathMedium(sock, message) {
-  const chatId = getChatId(message);
-  if (!chatId) return;
-
-  if (activeGames.has(chatId)) {
-    await sendText(sock, chatId, 'Game Math Medium sedang berjalan di chat ini.', message);
-    return;
-  }
-
-  activeGames.set(chatId, {
-    currentIndex: 0,
-    currentQuestion: null,
-    score: 0,
-    answers: [],
-    timer: null,
-  });
-
-  await askNextQuestion(sock, chatId);
-}
-
-async function handleMathMediumAnswer(sock, message) {
-  const chatId = getChatId(message);
-  const game = activeGames.get(chatId);
-  if (!game || !game.currentQuestion) return false;
-
-  const text = getText(message);
-  if (!/^-?\d+$/.test(text)) return false;
-
-  clearTimeout(game.timer);
-
-  const senderId = getSenderId(message);
-  const userAnswer = Number(text);
-  const isCorrect = userAnswer === game.currentQuestion.answer;
-
-  if (isCorrect) game.score += 1;
-
-  game.answers.push({
-    question: game.currentQuestion.text,
-    correctAnswer: game.currentQuestion.answer,
-    userAnswer,
-    senderId,
-    status: isCorrect ? 'correct' : 'wrong',
-  });
-
-  await sendText(
-    sock,
-    chatId,
-    isCorrect
-      ? '✅ Benar! Lanjut ke soal berikutnya.'
-      : `❌ Salah! Jawaban yang benar: ${game.currentQuestion.answer}`,
-    message,
+    mathEasyModule.createMathCommand ||
+    mathEasyModule.createMathGameCommand ||
+    mathEasyModule.createMathEasyCommand ||
+    mathEasyModule.createCommand ||
+    mathEasyModule.default
   );
-
-  game.currentIndex += 1;
-  await askNextQuestion(sock, chatId);
-  return true;
 }
 
-async function mathMediumCommand(sock, message) {
-  const text = getText(message).toLowerCase();
+function loadMathEasyFactory() {
+  const failures = [];
 
-  if (text === '/mathmedium') {
-    await startMathMedium(sock, message);
-    return true;
+  for (const modulePath of MATH_EASY_ENGINE_CANDIDATES) {
+    try {
+      const factory = getFactoryFromModule(require(modulePath));
+      if (typeof factory === 'function') return factory;
+      failures.push(`${modulePath}: factory tidak ditemukan`);
+    } catch (error) {
+      if (error.code !== 'MODULE_NOT_FOUND') throw error;
+      failures.push(`${modulePath}: ${error.message}`);
+    }
   }
 
-  return handleMathMediumAnswer(sock, message);
+  throw new Error(
+    [
+      'MathEasy engine/helper tidak ditemukan.',
+      'Command /mathmedium harus memakai ulang engine MathEasy untuk timer, session, XP, leaderboard, validasi, dan database.',
+      `Path yang dicoba: ${failures.join('; ')}`,
+    ].join(' '),
+  );
+}
+
+const mathMediumConfig = {
+  name: 'mathmedium',
+  command: COMMAND,
+  aliases: [COMMAND],
+  level: LEVEL_NAME,
+  levelName: LEVEL_NAME,
+  title: `🧮 Math ${LEVEL_NAME}`,
+  totalQuestions: TOTAL_QUESTIONS,
+  questionTimeMs: QUESTION_TIME_MS,
+  timeLimit: QUESTION_TIME_MS,
+  xp: XP_REWARD,
+  xpReward: XP_REWARD,
+  generateQuestion: generateMathMediumQuestion,
+  generator: generateMathMediumQuestion,
+};
+
+function createMathMediumCommand(overrides = {}) {
+  const createMathEasyCommand = loadMathEasyFactory();
+
+  return createMathEasyCommand({
+    ...mathMediumConfig,
+    ...overrides,
+  });
 }
 
 module.exports = {
-  name: 'mathmedium',
-  command: '/mathmedium',
-  description: 'Game matematika medium 50 soal dengan waktu 60 detik per soal.',
-  activeGames,
-  constants: {
-    TOTAL_QUESTIONS,
-    QUESTION_TIME_MS,
-    MIN_TWO_DIGIT,
-    MAX_TWO_DIGIT,
-    OPERATIONS,
-  },
-  handle: mathMediumCommand,
-  startMathMedium,
-  handleMathMediumAnswer,
-  makeQuestion,
+  ...mathMediumConfig,
+  createMathMediumCommand,
+  makeQuestion: generateMathMediumQuestion,
+  generateQuestion: generateMathMediumQuestion,
 };
